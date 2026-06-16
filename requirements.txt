@@ -1,1 +1,2 @@
-transformers
+Flask>=3.0,<4.0
+transformers>=4.41

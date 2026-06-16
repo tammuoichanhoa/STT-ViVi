@@ -1,3 +1,589 @@
-from transformers import pipeline
-transcriber = pipeline("automatic-speech-recognition", model="vinai/PhoWhisper-small")
-output = transcriber(path_to_audio_with_sampling_rate_16kHz)['text']
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STT_Vi | Bóc băng ghi âm</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #15120f;
+            --bg-glow: rgba(232, 146, 58, 0.16);
+            --panel: #1d1812;
+            --panel-raised: #271f17;
+            --line: #3a2f23;
+            --ink: #f3ecdf;
+            --muted: #a89884;
+            --muted-dim: #756657;
+            --accent: #e8923a;
+            --accent-soft: #f3b669;
+            --accent-ink: #1c1410;
+            --signal: #4fb8a6;
+            --danger: #d6624a;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 12% 0%, var(--bg-glow), transparent 42%),
+                radial-gradient(circle at 88% 18%, rgba(79, 184, 166, 0.08), transparent 38%),
+                var(--bg);
+            min-height: 100vh;
+        }
+
+        .shell {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 56px 20px 72px;
+        }
+
+        /* ---------- Header ---------- */
+        .topline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+
+        .rec-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 0 rgba(214, 98, 74, 0.6);
+            animation: pulse 2.2s ease-out infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(214, 98, 74, 0.55); }
+            70%  { box-shadow: 0 0 0 7px rgba(214, 98, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(214, 98, 74, 0); }
+        }
+
+        .eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        h1 {
+            font-family: 'Sora', sans-serif;
+            margin: 0 0 14px;
+            font-size: clamp(34px, 6vw, 52px);
+            font-weight: 700;
+            line-height: 1.08;
+            max-width: 620px;
+            letter-spacing: -0.01em;
+        }
+
+        .lead {
+            margin: 0 0 32px;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.65;
+            max-width: 560px;
+        }
+
+        .lead code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--panel-raised);
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            padding: 1px 6px;
+            font-size: 13px;
+            color: var(--accent-soft);
+        }
+
+        /* ---------- Level meter (signature element) ---------- */
+        .meter {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 46px;
+            margin-bottom: 36px;
+            padding: 0 1px;
+        }
+
+        .meter .bar {
+            flex: 1;
+            min-width: 3px;
+            border-radius: 2px;
+            background: linear-gradient(180deg, var(--accent-soft), var(--accent));
+            transform-origin: bottom;
+            animation: levelpulse 2.6s ease-in-out infinite;
+        }
+
+        .meter .bar:nth-child(odd)  { background: linear-gradient(180deg, var(--accent-soft), var(--accent)); }
+        .meter .bar:nth-child(5n)   { background: linear-gradient(180deg, #79d2c4, var(--signal)); }
+        .meter .bar:nth-child(2n)   { animation-duration: 2.1s; animation-delay: -0.4s; }
+        .meter .bar:nth-child(3n)   { animation-duration: 3s; animation-delay: -1.1s; }
+        .meter .bar:nth-child(4n)   { animation-duration: 1.8s; animation-delay: -0.7s; }
+        .meter .bar:nth-child(7n)   { animation-duration: 2.4s; animation-delay: -1.6s; }
+
+        @keyframes levelpulse {
+            0%, 100% { height: 18%; }
+            50%      { height: 100%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .meter .bar, .rec-dot { animation: none; }
+            .meter .bar:nth-child(2n) { height: 70%; }
+            .meter .bar:nth-child(3n) { height: 40%; }
+            .meter .bar:nth-child(4n) { height: 90%; }
+            .meter .bar:nth-child(5n) { height: 55%; }
+        }
+
+        /* ---------- Panels ---------- */
+        .panel {
+            position: relative;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel + .panel { margin-top: 22px; }
+
+        .panel-tag {
+            position: absolute;
+            top: -10px;
+            left: 24px;
+            background: var(--accent);
+            color: var(--accent-ink);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .panel-tag.signal { background: var(--signal); }
+
+        /* ---------- Error ---------- */
+        .error {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            border: 1px solid rgba(214, 98, 74, 0.35);
+            background: rgba(214, 98, 74, 0.1);
+            color: #f2b6a7;
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 22px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .error::before {
+            content: "!";
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--danger);
+            color: #1c1410;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* ---------- Form ---------- */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 160px;
+            gap: 18px;
+            margin-top: 6px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .dropzone {
+            position: relative;
+            border: 1.5px dashed var(--line);
+            border-radius: var(--radius-md);
+            background: var(--panel-raised);
+            padding: 26px 18px;
+            text-align: center;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .dropzone.is-drag,
+        .dropzone:focus-within {
+            border-color: var(--accent);
+            background: rgba(232, 146, 58, 0.08);
+        }
+
+        .dropzone.has-file {
+            border-style: solid;
+            border-color: var(--signal);
+        }
+
+        .dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .dz-icon {
+            color: var(--accent-soft);
+            margin-bottom: 8px;
+        }
+
+        .dz-title {
+            margin: 0 0 4px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .dz-meta {
+            margin: 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            color: var(--muted-dim);
+            letter-spacing: 0.02em;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            height: 100%;
+            min-height: 100px;
+            padding: 14px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--line);
+            background: var(--panel-raised);
+            color: var(--ink);
+            font: inherit;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        input[type="text"]:focus,
+        input[type="text"]:focus-visible {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232, 146, 58, 0.18);
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 22px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 14px 26px;
+            background: var(--accent);
+            color: var(--accent-ink);
+            font: inherit;
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.15s ease;
+        }
+
+        button:hover { background: var(--accent-soft); }
+        button:active { transform: scale(0.97); }
+        button:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(232, 146, 58, 0.35);
+        }
+
+        .note {
+            color: var(--muted-dim);
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 300px;
+        }
+
+        /* ---------- Result ---------- */
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: 13.5px;
+        }
+
+        .meta strong {
+            color: var(--ink);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+
+        .downloads {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 18px 0 26px;
+        }
+
+        .downloads a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--ink);
+            text-decoration: none;
+            border: 1px solid var(--line);
+            background: var(--panel-raised);
+            padding: 8px 14px 8px 12px;
+            border-radius: 999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            transition: border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .downloads a:hover {
+            border-color: var(--accent);
+            color: var(--accent-soft);
+        }
+
+        .downloads a::before {
+            content: "↓";
+            font-size: 13px;
+        }
+
+        h2.section-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 0 0 14px;
+            padding-top: 22px;
+            border-top: 1px solid var(--line);
+        }
+
+        section.result .meta-row + .downloads + h2.section-title:first-of-type,
+        section.result h2.section-title:first-child {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .transcript {
+            white-space: pre-wrap;
+            line-height: 1.75;
+            font-size: 16.5px;
+            margin: 0;
+            color: var(--ink);
+        }
+
+        .chunks {
+            display: grid;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .chunk {
+            display: grid;
+            grid-template-columns: 132px 1fr;
+            gap: 14px;
+            align-items: start;
+            padding: 12px 0;
+            border-left: 2px solid var(--line);
+            padding-left: 16px;
+        }
+
+        .chunk:hover { border-left-color: var(--signal); }
+
+        .chunk .ts {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            color: var(--signal);
+            white-space: nowrap;
+            padding-top: 2px;
+        }
+
+        .chunk .ts .sep {
+            color: var(--muted-dim);
+            margin: 0 3px;
+        }
+
+        .chunk .txt {
+            font-size: 15px;
+            line-height: 1.55;
+            color: var(--ink);
+        }
+
+        @media (max-width: 600px) {
+            .shell { padding-top: 36px; }
+            .panel { padding: 20px; border-radius: var(--radius-md); }
+            .grid { grid-template-columns: 1fr; }
+            input[type="text"] { min-height: 56px; text-align: left; }
+            .chunk { grid-template-columns: 1fr; gap: 4px; }
+            .chunk .ts { padding-top: 0; }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+
+        <div class="topline">
+            <span class="rec-dot" aria-hidden="true"></span>
+            <span class="eyebrow">PhoWhisper · vinai/PhoWhisper-small</span>
+        </div>
+
+        <h1>Bóc băng ghi âm tiếng Việt, gọn và rõ ràng.</h1>
+        <p class="lead">
+            Tải file audio hoặc video lên, hệ thống chạy mô hình <code>PhoWhisper-small</code>
+            và trả về transcript ngay trên web — kèm bản tải xuống dạng TXT, SRT hoặc JSON.
+        </p>
+
+        <div class="meter" aria-hidden="true">
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+            <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+        </div>
+
+        <section class="panel">
+            <span class="panel-tag">Bản ghi mới</span>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form action="{{ url_for('stt.transcribe') }}" method="post" enctype="multipart/form-data">
+                <div class="grid">
+                    <div>
+                        <label for="audio">File audio / video</label>
+                        <div class="dropzone" id="dropzone">
+                            <input id="audio" type="file" name="audio"
+                                   accept=".wav,.mp3,.m4a,.mp4,.ogg,.flac,.aac,.webm" required>
+                            <div class="dz-content">
+                                <svg class="dz-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M12 16V4M12 4L8 8M12 4L16 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M5 14v3a2 2 0 002 2h10a2 2 0 002-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <p class="dz-title">Kéo file vào đây, hoặc bấm để chọn</p>
+                                <p class="dz-meta" id="fileMeta">WAV · MP3 · M4A · MP4 · OGG · FLAC · AAC · WEBM</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="language">Ngôn ngữ</label>
+                        <input id="language" type="text" name="language" value="{{ language or 'vi' }}" placeholder="vi">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit">Bóc băng ngay</button>
+                    <span class="note">File gọn, rõ tiếng, ít tạp âm sẽ cho kết quả chính xác hơn.</span>
+                </div>
+            </form>
+        </section>
+
+        {% if transcript %}
+        <section class="panel result">
+            <span class="panel-tag signal">Kết quả</span>
+
+            <div class="meta-row">
+                <p class="meta">Tệp: <strong>{{ filename }}</strong></p>
+            </div>
+
+            <div class="downloads">
+                <a href="{{ downloads.txt }}">TXT</a>
+                <a href="{{ downloads.srt }}">SRT</a>
+                <a href="{{ downloads.json }}">JSON</a>
+            </div>
+
+            <h2 class="section-title">Transcript</h2>
+            <p class="transcript">{{ transcript }}</p>
+
+            {% if chunks %}
+            <h2 class="section-title">Phân đoạn theo thời gian</h2>
+            <div class="chunks">
+                {% for chunk in chunks %}
+                <article class="chunk">
+                    <div class="ts">
+                        {% if chunk.start is not none %}
+                            {{ '%.2f'|format(chunk.start) }}s
+                        {% else %}
+                            chưa có mốc thời gian
+                        {% endif %}
+                        {% if chunk.end is not none %}
+                            <span class="sep">→</span>{{ '%.2f'|format(chunk.end) }}s
+                        {% endif %}
+                    </div>
+                    <div class="txt">{{ chunk.text }}</div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+
+    <script>
+        const input = document.getElementById('audio');
+        const zone = document.getElementById('dropzone');
+        const meta = document.getElementById('fileMeta');
+
+        ['dragenter', 'dragover'].forEach(evt =>
+            input.addEventListener(evt, () => zone.classList.add('is-drag'))
+        );
+        ['dragleave', 'drop'].forEach(evt =>
+            input.addEventListener(evt, () => zone.classList.remove('is-drag'))
+        );
+
+        input.addEventListener('change', () => {
+            if (input.files && input.files[0]) {
+                const f = input.files[0];
+                const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+                meta.textContent = f.name + ' · ' + sizeMb + ' MB';
+                zone.classList.add('has-file');
+            }
+        });
+    </script>
+</body>
+</html>
