@@ -1,11 +1,14 @@
 import warnings
 import wave
 from pathlib import Path
+from time import perf_counter
 from threading import Lock
 
 import numpy as np
 import torchaudio
 from transformers import pipeline
+
+from app.runtime import application_root
 
 
 warnings.filterwarnings(
@@ -14,7 +17,7 @@ warnings.filterwarnings(
     category=FutureWarning,
 )
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = application_root()
 MODEL_DIR = BASE_DIR / "models"
 AVAILABLE_MODEL_SIZES = ("tiny", "small", "base", "medium", "large")
 DEFAULT_MODEL_SIZE = "small"
@@ -213,23 +216,28 @@ def transcribe_audio(
     if not path.exists():
         raise TranscriptionError(f"Không tìm thấy file: {path}")
 
-    transcriber = _get_transcriber(model_size)
+    inference_started_at = perf_counter()
 
     try:
-        result = _call_transcriber(transcriber, str(path), language)
-    except Exception as exc:
-        if not _is_missing_ffmpeg_error(exc):
-            raise TranscriptionError(f"Model không xử lý được file {path.name}: {exc}") from exc
+        transcriber = _get_transcriber(model_size)
 
         try:
-            audio_input = _load_audio_for_pipeline(path)
-            result = _call_transcriber(transcriber, audio_input, language)
-        except TranscriptionError:
-            raise
-        except Exception as fallback_exc:
-            raise TranscriptionError(
-                f"Model không xử lý được file {path.name}: {fallback_exc}"
-            ) from fallback_exc
+            result = _call_transcriber(transcriber, str(path), language)
+        except Exception as exc:
+            if not _is_missing_ffmpeg_error(exc):
+                raise TranscriptionError(f"Model không xử lý được file {path.name}: {exc}") from exc
+
+            try:
+                audio_input = _load_audio_for_pipeline(path)
+                result = _call_transcriber(transcriber, audio_input, language)
+            except TranscriptionError:
+                raise
+            except Exception as fallback_exc:
+                raise TranscriptionError(
+                    f"Model không xử lý được file {path.name}: {fallback_exc}"
+                ) from fallback_exc
+    finally:
+        inference_elapsed_seconds = perf_counter() - inference_started_at
 
     text = (result.get("text") or "").strip()
     if not text:
@@ -242,4 +250,5 @@ def transcribe_audio(
         "language": language,
         "model_size": model_size,
         "source": path.name,
+        "inference_seconds": round(inference_elapsed_seconds, 3),
     }

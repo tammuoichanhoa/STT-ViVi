@@ -109,6 +109,7 @@ def transcribe():
         "index.html",
         transcript=result["text"],
         chunks=result["chunks"],
+        inference_seconds=result["inference_seconds"],
         downloads=downloads,
         audio_url=audio_url,
         language=language,

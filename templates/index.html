@@ -14,7 +14,7 @@
 
         <div class="topline">
             <span class="rec-dot" aria-hidden="true"></span>
-            <span class="eyebrow">PhoWhisper · vinai/PhoWhisper</span>
+            <span class="eyebrow">PhoWhisper · baoanhtrinh</span>
         </div>
 
         <h1>Bóc băng ghi âm tiếng Việt</h1>
@@ -30,7 +30,7 @@
             <div class="error">{{ error }}</div>
             {% endif %}
 
-            <form action="{{ url_for('stt.transcribe') }}" method="post" enctype="multipart/form-data">
+            <form action="{{ url_for('stt.transcribe') }}" method="post" enctype="multipart/form-data" id="transcribeForm">
                 <div class="grid">
                     <div>
                         <label for="audio">File audio / video</label>
@@ -71,7 +71,18 @@
                 </div>
 
                 <div class="actions">
-                    <button type="submit">Bóc băng ngay</button>
+                    <button type="submit" id="submitButton">Bóc băng ngay</button>
+                </div>
+
+                <div class="inference-status" id="inferenceStatus" aria-hidden="true">
+                    <div class="inference-status-head">
+                        <span class="inference-label">Đang inference</span>
+                        <span class="inference-percent" id="inferencePercent">0%</span>
+                    </div>
+                    <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-live="polite" aria-label="Tiến trình inference">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="inference-note" id="inferenceNote">Hệ thống đang tải file và chạy mô hình PhoWhisper. Không đóng tab trong lúc xử lý.</p>
                 </div>
             </form>
         </section>
@@ -83,6 +94,7 @@
             <div class="meta-row">
                 <p class="meta">Tệp: <strong>{{ filename }}</strong></p>
                 <p class="meta">Model: <strong>PhoWhisper {{ model_size }}</strong></p>
+                <p class="meta">Inference: <strong>{{ '%.3f'|format(inference_seconds) }} giây</strong></p>
             </div>
 
             {% if audio_url %}
